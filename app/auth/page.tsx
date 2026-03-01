@@ -120,11 +120,11 @@ const SRM_EMAIL_RE = /^[a-zA-Z0-9._%+-]+@srmist\.edu\.in$/;
 
 // ── Stable components defined OUTSIDE AuthPage so React never remounts them ──
 
-function FW({ children }) {
+function FW({ children }: { children: React.ReactNode }) {
   return <div style={{ display:"flex", flexDirection:"column", gap:5 }}>{children}</div>;
 }
 
-function Label({ children, color }) {
+function Label({ children, color }: { children: React.ReactNode; color: string }) {
   return (
     <label style={{ fontSize:12, fontWeight:500, color, letterSpacing:"0.04em", textTransform:"uppercase", transition:"color .25s" }}>
       {children}
@@ -132,11 +132,11 @@ function Label({ children, color }) {
   );
 }
 
-function Hint({ children, color }) {
+function Hint({ children, color }: { children: React.ReactNode; color: string }) {
   return <span style={{ fontSize:11, color, transition:"color .25s" }}>{children}</span>;
 }
 
-function SendBtn({ disabled, sending, countdown, sent, verified, onClick, t }) {
+function SendBtn({ disabled, sending, countdown, sent, verified, onClick, t }: { disabled: boolean; sending: boolean; countdown: number; sent: boolean; verified: boolean; onClick: () => void; t: typeof LIGHT }) {
   return (
     <button
       type="button"
@@ -157,7 +157,7 @@ function SendBtn({ disabled, sending, countdown, sent, verified, onClick, t }) {
   );
 }
 
-function OtpEntry({ value, onChange, onVerify, error, hint, t }) {
+function OtpEntry({ value, onChange, onVerify, error, hint, t }: { value: string; onChange: (v: string) => void; onVerify: () => void; error: string; hint: string; t: typeof LIGHT }) {
   return (
     <>
       <div style={{ display:"flex", gap:8, marginTop:2 }}>
@@ -247,9 +247,18 @@ export default function AuthPage() {
   const [dark,    setDark]    = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [form,    setForm]    = useState({ regNo:"", name:"", email:"", password:"", gender:"", hostel:"", phone:"" });
-  const [ok,      setOk]      = useState(false);
 
-  // Phone OTP
+  // Flow state
+  const [step,    setStep]    = useState<"form"|"otp">("form");
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState("");
+  const [success, setSuccess] = useState("");
+
+  // Email OTP (post-registration)
+  const [emailOtp,       setEmailOtp]       = useState("");
+  const [otpCountdown,   setOtpCountdown]   = useState(0);
+
+  // Phone OTP (client-side demo — no backend yet)
   const [phoneSent,      setPhoneSent]      = useState(false);
   const [phoneOtp,       setPhoneOtp]       = useState("");
   const [phoneVerified,  setPhoneVerified]  = useState(false);
@@ -257,50 +266,39 @@ export default function AuthPage() {
   const [phoneSending,   setPhoneSending]   = useState(false);
   const [phoneCountdown, setPhoneCountdown] = useState(0);
 
-  // Email OTP
-  const [emailSent,      setEmailSent]      = useState(false);
-  const [emailOtp,       setEmailOtp]       = useState("");
-  const [emailVerified,  setEmailVerified]  = useState(false);
-  const [emailErr,       setEmailErr]       = useState("");
-  const [emailSending,   setEmailSending]   = useState(false);
-  const [emailCountdown, setEmailCountdown] = useState(0);
-  const [emailFmtErr,    setEmailFmtErr]    = useState("");
-
   const t = dark ? DARK : LIGHT;
 
-  const fiStyle = (extra = {}) => ({
+  const fiStyle = (extra: React.CSSProperties = {}): React.CSSProperties => ({
     width:"100%", padding:"10px 12px",
     fontSize:14, color:t.inputText, background:t.inputBg,
     border:`1.5px solid ${t.border}`, borderRadius:8,
     transition:"border-color .18s, box-shadow .18s, background .25s, color .25s",
-    appearance:"none",
+    appearance:"none" as const,
     ...extra,
   });
 
-  const focusOn  = e => { e.target.style.borderColor="#6366f1"; e.target.style.boxShadow="0 0 0 3px rgba(99,102,241,.12)"; };
-  const focusOff = (border) => e => { e.target.style.borderColor = border || t.border; e.target.style.boxShadow="none"; };
+  const focusOn  = (e: any) => { e.target.style.borderColor="#6366f1"; e.target.style.boxShadow="0 0 0 3px rgba(99,102,241,.12)"; };
+  const focusOff = (border?: string) => (e: any) => { e.target.style.borderColor = border || t.border; e.target.style.boxShadow="none"; };
 
-  const set = k => e => {
+  const set = (k: string) => (e: any) => {
     const val = e.target.value;
     setForm(p => ({ ...p, [k]: val, ...(k === "gender" ? { hostel:"" } : {}) }));
-    if (k === "email") {
-      setEmailFmtErr(""); setEmailSent(false);
-      setEmailVerified(false); setEmailOtp(""); setEmailErr("");
-    }
   };
 
-  const switchTab = toLogin => {
+  const switchTab = (toLogin: boolean) => {
     setIsLogin(toLogin);
+    setStep("form");
     setForm({ regNo:"", name:"", email:"", password:"", gender:"", hostel:"", phone:"" });
+    setError(""); setSuccess(""); setEmailOtp("");
     setPhoneSent(false); setPhoneOtp(""); setPhoneVerified(false); setPhoneErr(""); setPhoneCountdown(0);
-    setEmailSent(false); setEmailOtp(""); setEmailVerified(false); setEmailErr(""); setEmailCountdown(0); setEmailFmtErr("");
   };
 
-  const startCountdown = (setter) => {
-    let c = 30; setter(c);
+  const startCountdown = (setter: (v: number) => void) => {
+    let c = 60; setter(c);
     const iv = setInterval(() => { c--; setter(c); if (c <= 0) clearInterval(iv); }, 1000);
   };
 
+  // Phone OTP — demo only (no backend)
   const sendPhoneOtp = () => {
     if (form.phone.length < 10) return;
     setPhoneSending(true);
@@ -310,22 +308,100 @@ export default function AuthPage() {
     }, 1200);
   };
 
-  const sendEmailOtp = () => {
-    if (!SRM_EMAIL_RE.test(form.email)) {
-      setEmailFmtErr("Please enter a valid @srmist.edu.in email address.");
-      return;
+  // ── Submit: Login or Register ──
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(""); setSuccess(""); setLoading(true);
+    try {
+      if (isLogin) {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ regno: form.regNo, password: form.password }),
+        });
+        const data = await res.json();
+        if (!data.success) { setError(data.message); return; }
+        // Store token and user info
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        setSuccess("Signed in successfully! Redirecting…");
+        // TODO: redirect to dashboard
+      } else {
+        // Validate email format client-side
+        if (!SRM_EMAIL_RE.test(form.email)) {
+          setError("Please enter a valid @srmist.edu.in email address.");
+          return;
+        }
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            regno: form.regNo,
+            name: form.name,
+            email: form.email,
+            password: form.password,
+            phone: form.phone || undefined,
+            hostel: form.hostel || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!data.success) { setError(data.message); return; }
+        // Registration succeeded — switch to OTP verification step
+        setStep("otp");
+        startCountdown(setOtpCountdown);
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    setEmailFmtErr("");
-    setEmailSending(true);
-    setTimeout(() => {
-      setEmailSending(false); setEmailSent(true); setEmailErr(""); setEmailVerified(false); setEmailOtp("");
-      startCountdown(setEmailCountdown);
-    }, 1200);
   };
 
-  const submit = e => { e.preventDefault(); setOk(true); setTimeout(() => setOk(false), 2200); };
+  // ── Verify email OTP ──
+  const verifyOtp = async () => {
+    if (emailOtp.length !== 6) return;
+    setError(""); setLoading(true);
+    try {
+      const res = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ regno: form.regNo, otp: emailOtp }),
+      });
+      const data = await res.json();
+      if (!data.success) { setError(data.message); return; }
+      setSuccess("Email verified! Redirecting to sign in…");
+      setTimeout(() => { switchTab(true); setSuccess(""); }, 2000);
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const hostels = HOSTELS[form.gender] || [];
+  // ── Resend OTP ──
+  const resendOtp = async () => {
+    if (otpCountdown > 0) return;
+    setError(""); setLoading(true);
+    try {
+      const res = await fetch("/api/auth/resend-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ regno: form.regNo }),
+      });
+      const data = await res.json();
+      if (!data.success) { setError(data.message); return; }
+      setEmailOtp("");
+      startCountdown(setOtpCountdown);
+      setSuccess("OTP resent to your email.");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch {
+      setError("Failed to resend OTP.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const hostels: string[] = HOSTELS[form.gender as keyof typeof HOSTELS] || [];
 
   return (
     <>
@@ -395,7 +471,7 @@ export default function AuthPage() {
             <span>{dark ? "🌙 Dark" : "☀️ Light"}</span>
           </button>
 
-          <div className="card-anim" key={isLogin?"l":"r"} style={{ width:"100%", maxWidth:390, paddingTop:8, paddingBottom:8 }}>
+          <div className="card-anim" key={step === "otp" ? "otp" : isLogin?"l":"r"} style={{ width:"100%", maxWidth:390, paddingTop:8, paddingBottom:8 }}>
 
             {/* Logo */}
             <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:24 }}>
@@ -403,6 +479,80 @@ export default function AuthPage() {
               <span style={{ fontWeight:600, color:t.logoTxt, fontSize:15, transition:"color .25s" }}>CampusBot</span>
             </div>
 
+            {step === "otp" ? (
+            /* ── OTP VERIFICATION STEP ── */
+            <>
+              <h2 style={{ fontSize:22, fontWeight:700, color:t.heading, marginBottom:4, transition:"color .25s" }}>
+                Verify your email
+              </h2>
+              <p style={{ color:t.subtext, fontSize:13, marginBottom:8, transition:"color .25s" }}>
+                We sent a 6-digit code to
+              </p>
+              <p style={{ color:"#4f46e5", fontSize:13, fontWeight:600, marginBottom:24, wordBreak:"break-all" }}>
+                {form.email}
+              </p>
+
+              <FW>
+                <Label color={t.label}>Verification Code</Label>
+                <input
+                  style={{
+                    ...fiStyle(),
+                    fontFamily:"'DM Mono',monospace", fontSize:20, fontWeight:500,
+                    letterSpacing:".3em", textAlign:"center",
+                  }}
+                  placeholder="· · · · · ·"
+                  maxLength={6}
+                  value={emailOtp}
+                  onChange={e => { setEmailOtp(e.target.value.replace(/\D/g,"")); setError(""); }}
+                  onFocus={focusOn} onBlur={focusOff()}
+                />
+                <Hint color={t.hint}>Enter the 6-digit OTP sent to your email</Hint>
+              </FW>
+
+              {error && <p style={{ color:"#ef4444", fontSize:13, textAlign:"center", margin:"8px 0" }}>⚠ {error}</p>}
+              {success && <p style={{ color:"#16a34a", fontSize:13, textAlign:"center", margin:"8px 0" }}>✓ {success}</p>}
+
+              <button
+                className="submit-btn" type="button"
+                onClick={verifyOtp}
+                disabled={emailOtp.length !== 6 || loading}
+                style={{
+                  marginTop:12,
+                  opacity: (emailOtp.length !== 6 || loading) ? 0.6 : 1,
+                  cursor: (emailOtp.length !== 6 || loading) ? "not-allowed" : "pointer",
+                }}
+              >
+                {loading ? "Verifying…" : "Verify Email"}
+              </button>
+
+              <div style={{ marginTop:14, textAlign:"center" }}>
+                <span style={{ fontSize:12, color:t.hint }}>Didn't receive the code? </span>
+                <button
+                  onClick={resendOtp}
+                  disabled={otpCountdown > 0 || loading}
+                  style={{
+                    background:"none", border:"none",
+                    cursor: otpCountdown > 0 ? "default" : "pointer",
+                    color: otpCountdown > 0 ? t.hint : "#6366f1",
+                    fontWeight:600, fontSize:13,
+                  }}
+                >
+                  {otpCountdown > 0 ? `Resend in ${otpCountdown}s` : "Resend OTP"}
+                </button>
+              </div>
+
+              <p style={{ marginTop:14, textAlign:"center" }}>
+                <button onClick={() => { setStep("form"); setError(""); setSuccess(""); setEmailOtp(""); }} style={{
+                  background:"none", border:"none", cursor:"pointer",
+                  color:t.subtext, fontSize:13,
+                }}>
+                  ← Back to register
+                </button>
+              </p>
+            </>
+            ) : (
+            /* ── LOGIN / REGISTER FORM ── */
+            <>
             <h2 style={{ fontSize:22, fontWeight:700, color:t.heading, marginBottom:4, transition:"color .25s" }}>
               {isLogin ? "Sign in" : "Create account"}
             </h2>
@@ -442,26 +592,8 @@ export default function AuthPage() {
                   {/* SRM Email */}
                   <FW>
                     <Label color={t.label}>SRM Email</Label>
-                    <div style={{ display:"flex", border:`1.5px solid ${emailFmtErr ? "#ef4444" : t.border}`, borderRadius:8, overflow:"hidden", transition:"border-color .18s" }}>
-                      <input
-                        style={{ flex:1, padding:"10px 12px", fontSize:14, color:t.phoneTxt, border:"none", outline:"none", background:t.phoneBg, transition:"all .25s" }}
-                        placeholder="am5464@srmist.edu.in"
-                        value={form.email}
-                        onChange={set("email")}
-                        disabled={emailVerified}
-                        required
-                      />
-                      <SendBtn disabled={form.email.trim().length < 5} sending={emailSending} countdown={emailCountdown} sent={emailSent} verified={emailVerified} onClick={sendEmailOtp} t={t}/>
-                    </div>
-                    {emailFmtErr
-                      ? <span style={{ fontSize:12, color:"#ef4444" }}>⚠ {emailFmtErr}</span>
-                      : emailVerified
-                        ? <span style={{ fontSize:11, color:"#16a34a", fontWeight:500 }}>✓ Email verified</span>
-                        : <Hint color={t.hint}>e.g. am5464@srmist.edu.in · Must be your SRM email</Hint>
-                    }
-                    {emailSent && !emailVerified && (
-                      <OtpEntry value={emailOtp} onChange={v => { setEmailOtp(v); setEmailErr(""); }} onVerify={() => { if (emailOtp === "1234") { setEmailVerified(true); setEmailErr(""); } else setEmailErr("Incorrect OTP. Please try again."); }} error={emailErr} hint="Enter the OTP sent to your email · Demo: 1234" t={t}/>
-                    )}
+                    <input style={fiStyle()} type="email" placeholder="am5464@srmist.edu.in" value={form.email} onChange={set("email")} onFocus={focusOn} onBlur={focusOff()} required/>
+                    <Hint color={t.hint}>Must be your @srmist.edu.in email · OTP will be sent on registration</Hint>
                   </FW>
 
                   {/* Gender */}
@@ -483,7 +615,7 @@ export default function AuthPage() {
                       <div className="select-wrap">
                         <select style={fiStyle({ paddingRight:32, cursor:"pointer" })} value={form.hostel} onChange={set("hostel")} required>
                           <option value="" disabled>Select hostel</option>
-                          {hostels.map(h => <option key={h} value={h}>{h}</option>)}
+                          {hostels.map((h: string) => <option key={h} value={h}>{h}</option>)}
                         </select>
                       </div>
                       <Hint color={t.hint}>{form.gender === "Male" ? "Male: N Block, Paari, Kaari, Oori" : "Female: M Block, Meenakshi"}</Hint>
@@ -508,7 +640,7 @@ export default function AuthPage() {
                       : <Hint color={t.hint}>We'll send a 4-digit OTP to verify your number</Hint>
                     }
                     {phoneSent && !phoneVerified && (
-                      <OtpEntry value={phoneOtp} onChange={v => { setPhoneOtp(v); setPhoneErr(""); }} onVerify={() => { if (phoneOtp === "1234") { setPhoneVerified(true); setPhoneErr(""); } else setPhoneErr("Incorrect OTP. Please try again."); }} error={phoneErr} hint="Demo OTP is 1234" t={t}/>
+                      <OtpEntry value={phoneOtp} onChange={(v: string) => { setPhoneOtp(v); setPhoneErr(""); }} onVerify={() => { if (phoneOtp === "1234") { setPhoneVerified(true); setPhoneErr(""); } else setPhoneErr("Incorrect OTP. Please try again."); }} error={phoneErr} hint="Demo OTP is 1234" t={t}/>
                     )}
                   </FW>
                 </>
@@ -526,8 +658,11 @@ export default function AuthPage() {
                 </div>
               )}
 
-              <button className="submit-btn" type="submit" style={{ marginTop:4 }}>
-                {ok ? "✓ Done!" : isLogin ? "Sign In" : "Create Account"}
+              {error && <p style={{ color:"#ef4444", fontSize:13, textAlign:"center", margin:"4px 0" }}>⚠ {error}</p>}
+              {success && <p style={{ color:"#16a34a", fontSize:13, textAlign:"center", margin:"4px 0" }}>✓ {success}</p>}
+
+              <button className="submit-btn" type="submit" disabled={loading} style={{ marginTop:4, opacity: loading ? 0.7 : 1 }}>
+                {loading ? <><span className="submit-spinner"/>Please wait…</> : isLogin ? "Sign In" : "Create Account"}
               </button>
             </form>
 
@@ -537,6 +672,8 @@ export default function AuthPage() {
                 {isLogin ? "Register" : "Sign in"}
               </button>
             </p>
+          </>
+          )}
           </div>
         </div>
       </div>

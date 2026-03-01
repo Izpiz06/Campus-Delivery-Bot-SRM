@@ -25,6 +25,12 @@ export async function POST(req: Request){
                 {success:false, message: 'Invalid regno or password'},
                 {status: 401})
         }
+        //if email not verified, reject login
+        if(!user.is_verified){
+            return Response.json(
+                {success:false, message: 'Please verify your email before signing in'},
+                {status: 403})
+        }
         //if password hash is null, return error
         if (!user.password_hash){
             return Response.json(
