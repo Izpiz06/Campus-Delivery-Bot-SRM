@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: cdbot_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: cdbot
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  web:
+    build: .
+    container_name: cdbot_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/cdbot
+      JWT_SECRET: super_secret_campus_bot_key_2026
+      EMAIL_USER: mdizaan1192@gmail.com
+      EMAIL_PASS: qtjs rtwv qxkx wzue
+    depends_on:
+      - db
+    command: sh -c "npx prisma migrate deploy && npm start"
+
+volumes:
+  postgres_data:
