@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { sendOTPEmail } from "@/lib/mailer"
+import crypto from "crypto"
 
 type RegisterBody = {
   regno: string
@@ -10,7 +11,7 @@ type RegisterBody = {
   phone?: string
   hostel?: string // hostel name — will be resolved to hostel_id
 }
-
+//register route handler
 export async function POST(req: Request) {
   try {
     const body: RegisterBody = await req.json()
@@ -22,14 +23,14 @@ export async function POST(req: Request) {
         { status: 400 }
       )
     }
-
+    // Validate regno format (e.g., starts with "RA" followed by digits)
     if (!/^RA\d+$/.test(regno)) {
       return Response.json(
         { success: false, message: "Invalid Registration Number format" },
         { status: 400 }
       )
     }
-
+    // Validate email domain
     if (!email.endsWith("@srmist.edu.in")) {
       return Response.json(
         { success: false, message: "Use your SRM email address" },
@@ -45,14 +46,13 @@ export async function POST(req: Request) {
       })
       if (hostelRecord) hostel_id = hostelRecord.hostel_id
     }
-
     // Check if user already exists
     const existingUser = await prisma.users.findUnique({
       where: { regno }
     })
-
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
-
+    // If user exists and is verified, reject. If exists but unverified, update details and resend OTP. If not exists, create new user.
     if (existingUser) {
       // If already verified, reject
       if (existingUser.is_verified) {
@@ -90,13 +90,14 @@ export async function POST(req: Request) {
     }
 
     // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString()
+    const otp = crypto.randomInt(100000, 1000000).toString()
 
     // Store OTP in DB
     await prisma.email_verifications.create({
       data: {
         regno,
-        otp_code: otp,
+        otp_code_email: otp,
+        otp_code_mobile: "000000", // placeholder until mobile OTP is implemented
         expires_at: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
       }
     })

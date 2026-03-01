@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     }
     // Find OTP record
     const record = await prisma.email_verifications.findFirst({
-      where: { regno, otp_code: otp }
+      where: { regno, otp_code_email: otp }
     })
     // Check if record exists and is not expired
     if (!record) {

@@ -43,7 +43,8 @@ export async function POST(req: Request) {
     await prisma.email_verifications.create({
       data: {
         regno,
-        otp_code: otp,
+        otp_code_email: otp,
+        otp_code_mobile: "000000", // placeholder until mobile OTP is implemented
         expires_at: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
       }
     })

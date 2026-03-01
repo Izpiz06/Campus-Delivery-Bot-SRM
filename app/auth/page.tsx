@@ -157,41 +157,67 @@ function SendBtn({ disabled, sending, countdown, sent, verified, onClick, t }: {
   );
 }
 
-function OtpEntry({ value, onChange, onVerify, error, hint, t }: { value: string; onChange: (v: string) => void; onVerify: () => void; error: string; hint: string; t: typeof LIGHT }) {
+function OTPBoxes({ length = 6, value, onChange, t }: { length?: number; value: string; onChange: (v: string) => void; t: typeof LIGHT }) {
+  const digits = value.padEnd(length, "").split("").slice(0, length);
+  const inputRefs: (HTMLInputElement | null)[] = [];
+
+  const handleChange = (idx: number, char: string) => {
+    if (!/^\d?$/.test(char)) return;
+    const arr = [...digits];
+    arr[idx] = char;
+    onChange(arr.join("").replace(/\s/g, ""));
+    if (char && idx < length - 1) inputRefs[idx + 1]?.focus();
+  };
+
+  const handleKeyDown = (idx: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !digits[idx] && idx > 0) {
+      inputRefs[idx - 1]?.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, length);
+    onChange(pasted);
+    const focusIdx = Math.min(pasted.length, length - 1);
+    inputRefs[focusIdx]?.focus();
+  };
+
   return (
-    <>
-      <div style={{ display:"flex", gap:8, marginTop:2 }}>
+    <div style={{ display:"flex", gap:8, justifyContent:"center" }}>
+      {Array.from({ length }).map((_, i) => (
         <input
+          key={i}
+          ref={el => { inputRefs[i] = el; }}
+          type="text"
+          inputMode="numeric"
+          maxLength={1}
+          value={digits[i]?.trim() || ""}
+          onChange={e => handleChange(i, e.target.value)}
+          onKeyDown={e => handleKeyDown(i, e)}
+          onPaste={i === 0 ? handlePaste : undefined}
           style={{
-            flex:1, padding:"10px 12px",
-            fontFamily:"'DM Mono',monospace", fontSize:18, fontWeight:500,
-            letterSpacing:".35em", textAlign:"center",
+            width:44, height:52,
+            textAlign:"center",
+            fontSize:20, fontWeight:600,
+            fontFamily:"'DM Mono',monospace",
             color:t.otpTxt, background:t.otpBg,
-            border:`1.5px solid ${t.border}`, borderRadius:8,
-            transition:"all .18s",
+            border:`1.5px solid ${t.border}`,
+            borderRadius:10,
+            transition:"border-color .18s, box-shadow .18s",
+            outline:"none",
           }}
-          placeholder="· · · ·"
-          maxLength={4}
-          value={value}
-          onChange={e => onChange(e.target.value.replace(/\D/g,""))}
+          onFocus={e => {
+            e.target.style.borderColor = "#6366f1";
+            e.target.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.12)";
+          }}
+          onBlur={e => {
+            e.target.style.borderColor = t.border;
+            e.target.style.boxShadow = "none";
+          }}
         />
-        <button
-          type="button"
-          onClick={onVerify}
-          disabled={value.length < 4}
-          style={{
-            padding:"10px 18px", borderRadius:8, border:"none",
-            background: value.length < 4 ? t.verifyDis : "#4f46e5",
-            color: value.length < 4 ? t.verifyDisTxt : "white",
-            fontSize:14, fontWeight:600,
-            cursor: value.length < 4 ? "not-allowed" : "pointer",
-            transition:"all .15s", whiteSpace:"nowrap",
-          }}
-        >Verify</button>
-      </div>
-      {error && <span style={{ fontSize:12, color:"#ef4444" }}>⚠ {error}</span>}
-      <Hint color={t.hint}>{hint}</Hint>
-    </>
+      ))}
+    </div>
   );
 }
 
@@ -258,13 +284,11 @@ export default function AuthPage() {
   const [emailOtp,       setEmailOtp]       = useState("");
   const [otpCountdown,   setOtpCountdown]   = useState(0);
 
-  // Phone OTP (client-side demo — no backend yet)
-  const [phoneSent,      setPhoneSent]      = useState(false);
+  // Phone OTP (on verification step)
   const [phoneOtp,       setPhoneOtp]       = useState("");
-  const [phoneVerified,  setPhoneVerified]  = useState(false);
-  const [phoneErr,       setPhoneErr]       = useState("");
   const [phoneSending,   setPhoneSending]   = useState(false);
   const [phoneCountdown, setPhoneCountdown] = useState(0);
+  const [phoneSent,      setPhoneSent]      = useState(false);
 
   const t = dark ? DARK : LIGHT;
 
@@ -290,7 +314,7 @@ export default function AuthPage() {
     setStep("form");
     setForm({ regNo:"", name:"", email:"", password:"", gender:"", hostel:"", phone:"" });
     setError(""); setSuccess(""); setEmailOtp("");
-    setPhoneSent(false); setPhoneOtp(""); setPhoneVerified(false); setPhoneErr(""); setPhoneCountdown(0);
+    setPhoneSent(false); setPhoneOtp(""); setPhoneCountdown(0);
   };
 
   const startCountdown = (setter: (v: number) => void) => {
@@ -298,12 +322,12 @@ export default function AuthPage() {
     const iv = setInterval(() => { c--; setter(c); if (c <= 0) clearInterval(iv); }, 1000);
   };
 
-  // Phone OTP — demo only (no backend)
+  // Send phone OTP (demo — no backend yet)
   const sendPhoneOtp = () => {
     if (form.phone.length < 10) return;
     setPhoneSending(true);
     setTimeout(() => {
-      setPhoneSending(false); setPhoneSent(true); setPhoneErr(""); setPhoneVerified(false); setPhoneOtp("");
+      setPhoneSending(false); setPhoneSent(true); setPhoneOtp("");
       startCountdown(setPhoneCountdown);
     }, 1200);
   };
@@ -482,67 +506,132 @@ export default function AuthPage() {
             {step === "otp" ? (
             /* ── OTP VERIFICATION STEP ── */
             <>
-              <h2 style={{ fontSize:22, fontWeight:700, color:t.heading, marginBottom:4, transition:"color .25s" }}>
-                Verify your email
+              <h2 style={{ fontSize:22, fontWeight:700, color:t.heading, marginBottom:6, transition:"color .25s" }}>
+                Verify your account
               </h2>
-              <p style={{ color:t.subtext, fontSize:13, marginBottom:8, transition:"color .25s" }}>
-                We sent a 6-digit code to
-              </p>
-              <p style={{ color:"#4f46e5", fontSize:13, fontWeight:600, marginBottom:24, wordBreak:"break-all" }}>
-                {form.email}
+              <p style={{ color:t.subtext, fontSize:13, marginBottom:28, transition:"color .25s", lineHeight:1.6 }}>
+                Enter the codes sent to your email and phone to complete registration.
               </p>
 
-              <FW>
-                <Label color={t.label}>Verification Code</Label>
-                <input
-                  style={{
-                    ...fiStyle(),
-                    fontFamily:"'DM Mono',monospace", fontSize:20, fontWeight:500,
-                    letterSpacing:".3em", textAlign:"center",
-                  }}
-                  placeholder="· · · · · ·"
-                  maxLength={6}
-                  value={emailOtp}
-                  onChange={e => { setEmailOtp(e.target.value.replace(/\D/g,"")); setError(""); }}
-                  onFocus={focusOn} onBlur={focusOff()}
-                />
-                <Hint color={t.hint}>Enter the 6-digit OTP sent to your email</Hint>
-              </FW>
+              {/* Email OTP Card */}
+              <div style={{
+                padding:"20px 18px", borderRadius:12,
+                border:`1.5px solid ${t.border}`, background:t.inputBg,
+                marginBottom:20, transition:"all .25s",
+              }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+                  <div>
+                    <Label color={t.label}>Email Verification</Label>
+                    <p style={{ fontSize:12, color:"#4f46e5", fontWeight:500, marginTop:4, wordBreak:"break-all" }}>
+                      {form.email}
+                    </p>
+                  </div>
+                  <div style={{ width:36, height:36, borderRadius:10, background:t.otpSendBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>
+                    ✉️
+                  </div>
+                </div>
+                <OTPBoxes value={emailOtp} onChange={v => { setEmailOtp(v); setError(""); }} t={t} />
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:10 }}>
+                  <Hint color={t.hint}>6-digit code from your email</Hint>
+                  <button
+                    onClick={resendOtp}
+                    disabled={otpCountdown > 0 || loading}
+                    style={{
+                      background:"none", border:"none", padding:0,
+                      cursor: otpCountdown > 0 ? "default" : "pointer",
+                      color: otpCountdown > 0 ? t.hint : "#6366f1",
+                      fontWeight:600, fontSize:12,
+                    }}
+                  >
+                    {otpCountdown > 0 ? `Resend ${otpCountdown}s` : "Resend"}
+                  </button>
+                </div>
+              </div>
 
-              {error && <p style={{ color:"#ef4444", fontSize:13, textAlign:"center", margin:"8px 0" }}>⚠ {error}</p>}
-              {success && <p style={{ color:"#16a34a", fontSize:13, textAlign:"center", margin:"8px 0" }}>✓ {success}</p>}
+              {/* Phone OTP Card */}
+              <div style={{
+                padding:"20px 18px", borderRadius:12,
+                border:`1.5px solid ${t.border}`, background:t.inputBg,
+                marginBottom:24, transition:"all .25s",
+              }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+                  <div>
+                    <Label color={t.label}>Phone Verification</Label>
+                    <p style={{ fontSize:12, color:"#4f46e5", fontWeight:500, marginTop:4 }}>
+                      +91 {form.phone}
+                    </p>
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    {!phoneSent ? (
+                      <button
+                        type="button"
+                        onClick={sendPhoneOtp}
+                        disabled={phoneSending || form.phone.length < 10}
+                        style={{
+                          padding:"6px 14px", fontSize:12, fontWeight:600,
+                          color: (phoneSending || form.phone.length < 10) ? t.hint : "white",
+                          background: (phoneSending || form.phone.length < 10) ? t.otpSendBg : "#4f46e5",
+                          border:"none", borderRadius:8,
+                          cursor: (phoneSending || form.phone.length < 10) ? "not-allowed" : "pointer",
+                          transition:"all .18s",
+                        }}
+                      >
+                        {phoneSending ? "Sending…" : "Send OTP"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={sendPhoneOtp}
+                        disabled={phoneCountdown > 0 || phoneSending}
+                        style={{
+                          padding:"6px 14px", fontSize:12, fontWeight:600,
+                          color: phoneCountdown > 0 ? t.hint : "#4f46e5",
+                          background:t.otpSendBg, border:"none", borderRadius:8,
+                          cursor: phoneCountdown > 0 ? "default" : "pointer",
+                          transition:"all .18s",
+                        }}
+                      >
+                        {phoneCountdown > 0 ? `Resend ${phoneCountdown}s` : "Resend"}
+                      </button>
+                    )}
+                    <div style={{ width:36, height:36, borderRadius:10, background:t.otpSendBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>
+                      📱
+                    </div>
+                  </div>
+                </div>
+                {phoneSent ? (
+                  <OTPBoxes value={phoneOtp} onChange={v => { setPhoneOtp(v); setError(""); }} t={t} />
+                ) : (
+                  <div style={{ display:"flex", gap:8, justifyContent:"center", opacity:0.25 }}>
+                    {Array.from({length:6}).map((_,i) => (
+                      <div key={i} style={{
+                        width:44, height:52, borderRadius:10,
+                        border:`1.5px dashed ${t.border}`, background:t.otpBg,
+                      }} />
+                    ))}
+                  </div>
+                )}
+                <Hint color={t.hint}>{phoneSent ? "6-digit code from your phone" : "Tap Send OTP to receive a code"}</Hint>
+              </div>
+
+              {error && <p style={{ color:"#ef4444", fontSize:13, textAlign:"center", marginBottom:8 }}>⚠ {error}</p>}
+              {success && <p style={{ color:"#16a34a", fontSize:13, textAlign:"center", marginBottom:8 }}>✓ {success}</p>}
 
               <button
                 className="submit-btn" type="button"
                 onClick={verifyOtp}
                 disabled={emailOtp.length !== 6 || loading}
                 style={{
-                  marginTop:12,
+                  marginTop:4,
                   opacity: (emailOtp.length !== 6 || loading) ? 0.6 : 1,
                   cursor: (emailOtp.length !== 6 || loading) ? "not-allowed" : "pointer",
                 }}
               >
-                {loading ? "Verifying…" : "Verify Email"}
+                {loading ? "Verifying…" : "Verify & Continue"}
               </button>
 
-              <div style={{ marginTop:14, textAlign:"center" }}>
-                <span style={{ fontSize:12, color:t.hint }}>Didn't receive the code? </span>
-                <button
-                  onClick={resendOtp}
-                  disabled={otpCountdown > 0 || loading}
-                  style={{
-                    background:"none", border:"none",
-                    cursor: otpCountdown > 0 ? "default" : "pointer",
-                    color: otpCountdown > 0 ? t.hint : "#6366f1",
-                    fontWeight:600, fontSize:13,
-                  }}
-                >
-                  {otpCountdown > 0 ? `Resend in ${otpCountdown}s` : "Resend OTP"}
-                </button>
-              </div>
-
-              <p style={{ marginTop:14, textAlign:"center" }}>
-                <button onClick={() => { setStep("form"); setError(""); setSuccess(""); setEmailOtp(""); }} style={{
+              <p style={{ marginTop:16, textAlign:"center" }}>
+                <button onClick={() => { setStep("form"); setError(""); setSuccess(""); setEmailOtp(""); setPhoneOtp(""); setPhoneSent(false); }} style={{
                   background:"none", border:"none", cursor:"pointer",
                   color:t.subtext, fontSize:13,
                 }}>
@@ -631,17 +720,10 @@ export default function AuthPage() {
                         style={{ flex:1, padding:"10px 8px", fontSize:14, color:t.phoneTxt, border:"none", outline:"none", background:t.phoneBg, transition:"all .25s" }}
                         placeholder="9876543210" maxLength={10}
                         value={form.phone} onChange={set("phone")}
-                        disabled={phoneVerified} required
+                        required
                       />
-                      <SendBtn disabled={form.phone.length < 10} sending={phoneSending} countdown={phoneCountdown} sent={phoneSent} verified={phoneVerified} onClick={sendPhoneOtp} t={t}/>
                     </div>
-                    {phoneVerified
-                      ? <span style={{ fontSize:11, color:"#16a34a", fontWeight:500 }}>✓ Phone number verified</span>
-                      : <Hint color={t.hint}>We'll send a 4-digit OTP to verify your number</Hint>
-                    }
-                    {phoneSent && !phoneVerified && (
-                      <OtpEntry value={phoneOtp} onChange={(v: string) => { setPhoneOtp(v); setPhoneErr(""); }} onVerify={() => { if (phoneOtp === "1234") { setPhoneVerified(true); setPhoneErr(""); } else setPhoneErr("Incorrect OTP. Please try again."); }} error={phoneErr} hint="Demo OTP is 1234" t={t}/>
-                    )}
+                    <Hint color={t.hint}>OTP will be sent after registration</Hint>
                   </FW>
                 </>
               )}
