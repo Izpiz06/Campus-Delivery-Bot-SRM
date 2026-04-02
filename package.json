@@ -17,7 +17,8 @@
     "nodemailer": "^8.0.1",
     "prisma": "^6.19.2",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "three": "^0.183.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
