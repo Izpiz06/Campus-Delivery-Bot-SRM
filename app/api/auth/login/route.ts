@@ -45,10 +45,10 @@ export async function POST(req: Request){
                     {success:false, message: 'Invalid regno or password'},
                     {status: 401})
             }
-        //generate jwt token with regno as payload and secret key from env variable, set expiration to 1 day
-        const token=jwt.sign({regno: user.regno},process.env.JWT_SECRET as string,
+        //generate jwt token with regno and role as payload and secret key from env variable, set expiration to 1 day
+        const token=jwt.sign({regno: user.regno, role: user.role},process.env.JWT_SECRET as string,
         {expiresIn: '1d'})
-        return Response.json({success:true, token,user:{regno: user.regno, name: user.name, email:user.email}})
+        return Response.json({success:true, token,user:{regno: user.regno, name: user.name, email:user.email, role: user.role}})
     //catch any error and return 500 status code with error message
     } catch(error){
         console.error(error)

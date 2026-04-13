@@ -48,7 +48,7 @@ const DARK = {
 // CONSTANTS & HELPERS
 // ────────────────────────────────────────────────────────────────────────────
 
-const HOSTELS = { Male: ["N Block", "Paari", "Kaari", "Oori"], Female: ["M Block", "Meenakshi"] };
+const HOSTELS = { Male: ["N Block", "Paari", "Kaari", "Oori","Adhiyaman", "Agasthiyar","Sannasi-A","Sannasi-C","Manoranjitham","Mullai","Began"], Female: ["M Block", "Meenakshi","ESQ","KC"] };
 
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
@@ -179,7 +179,12 @@ export default function AuthPage() {
         else {
           localStorage.setItem("token", data.token);
           localStorage.setItem("user", JSON.stringify(data.user));
-          router.push("/dashboard");
+          // Role-based redirect: admin → /dashboard, user → /user/tracking
+          if (data.user.role === "admin") {
+            router.push("/dashboard");
+          } else {
+            router.push("/user/tracking");
+          }
         }
       } else {
         const res = await fetch("/api/auth/register", {
@@ -301,7 +306,7 @@ export default function AuthPage() {
                     Terminal Status
                   </p>
                   <p style={{ fontSize: 28, fontWeight: 900, marginBottom: 16, lineHeight: 1.1 }}>
-                    ACTIVE<br/>CONNECTION
+                    ACTIVE<br />CONNECTION
                   </p>
                   <p style={{ fontSize: 12, lineHeight: 1.8, opacity: 0.85, maxWidth: 280 }}>
                     ESTABLISHING SECURE UPLINK TO THE CAMPUS LOGISTICS NETWORK. PLEASE VERIFY OPERATOR CREDENTIALS TO INITIALIZE MISSION PARAMETERS.
@@ -486,7 +491,11 @@ export default function AuthPage() {
                         fontSize: 14, color: t.subtext, padding: 4,
                       }}
                     >
-                      {showPw ? "🙈" : "👁️"}
+                      {showPw ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+                      )}
                     </button>
                   </div>
                 </div>

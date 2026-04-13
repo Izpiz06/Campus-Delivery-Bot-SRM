@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 const LIGHT = {
   bg: "#f6f6f6",
   cardBg: "#ffffff",
+  cardText: "#000000",
   accent: "#FACC15",
   text: "#000000",
   subtext: "#6b7280",
@@ -21,11 +22,12 @@ const LIGHT = {
 
 const DARK = {
   bg: "#0a0a0a",
-  cardBg: "#111111",
+  cardBg: "#ffffff",
+  cardText: "#000000",
   accent: "#FF3333",
   text: "#ffffff",
   subtext: "#a1a1aa",
-  border: "#FF3333",
+  border: "#ffffff",
   sidebarBg: "#0a0a0a",
   sidebarHeaderBg: "#111111",
   navbarBg: "#111111",
@@ -351,7 +353,7 @@ export default function CampusBotDashboard() {
 
                   {/* Battery */}
                   <div style={{
-                    background: t.cardBg, border: `4px solid ${t.border}`,
+                    background: t.cardBg, color: t.cardText, border: `4px solid ${t.border}`,
                     padding: 24, boxShadow: cardShadow,
                   }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
@@ -371,7 +373,7 @@ export default function CampusBotDashboard() {
 
                   {/* Speed */}
                   <div style={{
-                    background: t.cardBg, border: `4px solid ${t.border}`,
+                    background: t.cardBg, color: t.cardText, border: `4px solid ${t.border}`,
                     padding: 24, boxShadow: cardShadow,
                   }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
@@ -388,7 +390,7 @@ export default function CampusBotDashboard() {
 
                   {/* Pending */}
                   <div style={{
-                    background: t.cardBg, border: `4px solid ${t.border}`,
+                    background: t.cardBg, color: t.cardText, border: `4px solid ${t.border}`,
                     padding: 24, boxShadow: cardShadow,
                   }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
@@ -408,9 +410,35 @@ export default function CampusBotDashboard() {
               {/* ── RIGHT COLUMN ── */}
               <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
 
+                {/* Predicted Arrival */}
+                <div style={{
+                  background: t.accent, border: `4px solid ${t.border}`,
+                  padding: 24, boxShadow: bigShadow, color: "#000",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 900, textTransform: "uppercase",
+                      letterSpacing: "-0.02em",
+                      background: "#000", color: t.accent, padding: "4px 8px",
+                    }}>PREDICTED_ARRIVAL</span>
+                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>schedule</span>
+                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.7, textTransform: "uppercase", marginBottom: 4 }}>
+                    ETA_REMAINING
+                  </div>
+                  <div style={{
+                    fontSize: 44, fontWeight: 900, lineHeight: 1, letterSpacing: "-0.04em",
+                  }}>
+                    08:45 <span style={{ fontSize: 16 }}>MIN</span>
+                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 700, marginTop: 8, opacity: 0.7 }}>
+                    MISSION #ASC-402 → PARI HOSTEL BLOCK A
+                  </div>
+                </div>
+
                 {/* Efficiency Index */}
                 <div style={{
-                  background: t.cardBg, border: `4px solid ${t.border}`,
+                  background: t.cardBg, color: t.cardText, border: `4px solid ${t.border}`,
                   padding: 24, boxShadow: bigShadow,
                 }}>
                   <h3 style={{
@@ -461,7 +489,7 @@ export default function CampusBotDashboard() {
                       { from: "FOOD_CRT", to: "ADMIN_B", eta: "8 MINS", active: false },
                     ].map((route, i) => (
                       <div key={i} style={{
-                        background: t.cardBg, border: `4px solid ${t.border}`,
+                        background: t.cardBg, color: t.cardText, border: `4px solid ${t.border}`,
                         padding: "12px 16px", display: "flex", alignItems: "center", gap: 12,
                       }}>
                         <div style={{
@@ -489,10 +517,10 @@ export default function CampusBotDashboard() {
                       background: t.cardBg, border: `4px solid ${t.border}`,
                       fontWeight: 900, fontSize: 11, cursor: "pointer",
                       boxShadow: cardShadow, transition: "all 0.1s",
-                      color: t.text, textTransform: "uppercase",
+                      color: t.cardText, textTransform: "uppercase",
                     }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = t.accent; (e.currentTarget as HTMLElement).style.color = "#000"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = t.cardBg; (e.currentTarget as HTMLElement).style.color = t.text; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = t.cardBg; (e.currentTarget as HTMLElement).style.color = t.cardText; }}
                     onMouseDown={e => {
                       (e.currentTarget as HTMLElement).style.transform = "translate(2px, 2px)";
                       (e.currentTarget as HTMLElement).style.boxShadow = "none";
@@ -511,7 +539,7 @@ export default function CampusBotDashboard() {
             {/* ══════════════ FOOTER TASK BAR ══════════════ */}
             <footer style={{
               marginTop: 32, padding: 16,
-              background: t.cardBg, border: `4px solid ${t.border}`,
+              background: t.cardBg, color: t.cardText, border: `4px solid ${t.border}`,
               boxShadow: bigShadow,
               display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 24,
             }}>

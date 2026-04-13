@@ -3,6 +3,16 @@
 :root {
   --background: #f6f6f6;
   --foreground: #000000;
+
+  /* User theme (SRM ASCEND orange) */
+  --user-accent: #FF5F15;
+  --user-bg: #F4F1EA;
+  --user-card-bg: #ffffff;
+  --user-text: #1c1c18;
+  --user-subtext: #5e5e5e;
+  --user-border: #000000;
+  --user-error: #ba1a1a;
+  --user-surface: #fcf9f2;
 }
 
 @theme inline {
@@ -30,6 +40,10 @@ body {
 
 .neo-shadow-lg {
   box-shadow: 8px 8px 0px 0px rgba(0,0,0,1);
+}
+
+.neo-shadow-xl {
+  box-shadow: 10px 10px 0px 0px rgba(0,0,0,1);
 }
 
 .neo-shadow-active {
@@ -74,7 +88,29 @@ body {
   50% { opacity: 0.3; }
 }
 
+/* Marquee animation */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee 20s linear infinite;
+}
+
+/* Industrial dot-grid background */
+.industrial-grid {
+  background-image: radial-gradient(#8f7066 0.5px, transparent 0.5px);
+  background-size: 24px 24px;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #000; }
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
